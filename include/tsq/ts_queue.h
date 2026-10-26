@@ -6,6 +6,8 @@
 #include <queue>
 #include <optional>
 
+namespace tsq {
+
 template <typename T>
 class ts_queue final {
   mutable std::mutex m_;
@@ -76,3 +78,5 @@ public:
     cv_.notify_all();
   }
 };
+
+}  // namespace tsq
