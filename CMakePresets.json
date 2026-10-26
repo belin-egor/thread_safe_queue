@@ -1,0 +1,37 @@
+{
+  "version": 3,
+  "cmakeMinimumRequired": { "major": 3, "minor": 21, "patch": 0 },
+  "configurePresets": [
+    {
+      "name": "base",
+      "hidden": true,
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "cacheVariables": {
+        "CMAKE_CXX_COMPILER": "clang++-20",
+        "CMAKE_BUILD_TYPE": "Debug"
+      }
+    },
+    {
+      "name": "debug",
+      "displayName": "Debug (clang++-20)",
+      "inherits": "base"
+    },
+    {
+      "name": "tsan",
+      "displayName": "ThreadSanitizer (clang++-20)",
+      "inherits": "base",
+      "cacheVariables": { "ENABLE_TSAN": "ON" }
+    },
+    {
+      "name": "asan",
+      "displayName": "AddressSanitizer + UBSan (clang++-20)",
+      "inherits": "base",
+      "cacheVariables": { "ENABLE_ASAN": "ON" }
+    }
+  ],
+  "buildPresets": [
+    { "name": "debug", "configurePreset": "debug" },
+    { "name": "tsan", "configurePreset": "tsan" },
+    { "name": "asan", "configurePreset": "asan" }
+  ]
+}
