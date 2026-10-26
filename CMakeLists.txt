@@ -21,7 +21,7 @@ target_include_directories(tsq INTERFACE include)
 target_link_libraries(tsq INTERFACE Threads::Threads)
 target_compile_options(tsq INTERFACE -Wall -Wextra -Wpedantic)
 
-add_executable(example examples/main.cpp)
+add_executable(example examples/example.cpp)
 target_link_libraries(example PRIVATE tsq)
 
 if(ENABLE_TSAN)
