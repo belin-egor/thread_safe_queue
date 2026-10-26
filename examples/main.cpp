@@ -4,23 +4,23 @@
 #include <iostream>
 #include <thread>
 
-#include "ts_queue.h"
+#include <tsq/ts_queue.h>
 
-void produce(int64_t start, int64_t end, ts_queue<int64_t> &tsq) {
+void produce(int64_t start, int64_t end, tsq::ts_queue<int64_t> &tsq) {
   for (auto i = start; i < end; ++i) {
     bool open = tsq.push(i);
     if (!open) return;
   }
 }
 
-void consume(ts_queue<int64_t> &tsq, std::atomic<int64_t> &sum) {
+void consume(tsq::ts_queue<int64_t> &tsq, std::atomic<int64_t> &sum) {
   while (auto optVal = tsq.pop()) {
     sum += optVal.value();
   }
 }
 
 int main() {
-  ts_queue<int64_t> tsq;
+  tsq::ts_queue<int64_t> tsq;
   std::atomic<int64_t> sum = 0;
   const int64_t N = 100000;
   {
