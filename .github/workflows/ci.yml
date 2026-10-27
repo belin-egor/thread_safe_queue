@@ -1,0 +1,45 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# A new push to a PR cancels the previous, now outdated run for that PR.
+# Runs on main are never cancelled, so every merge gets a full check.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  test:
+    name: ${{ matrix.preset }}
+    runs-on: ubuntu-24.04
+    strategy:
+      # Run all presets even if one of them fails
+      fail-fast: false
+      matrix:
+        preset: [debug, tsan, asan]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install clang-20
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang-20
+
+      # Older TSan runtimes fail with "unexpected memory mapping" on kernels
+      # with high ASLR entropy; this is safe on a throwaway CI machine.
+      - name: Reduce ASLR entropy for TSan
+        if: matrix.preset == 'tsan'
+        run: sudo sysctl vm.mmap_rnd_bits=28
+
+      - name: Configure
+        run: cmake --preset ${{ matrix.preset }}
+
+      - name: Build
+        run: cmake --build --preset ${{ matrix.preset }} --parallel
+
+      - name: Test
+        run: ctest --preset ${{ matrix.preset }}
