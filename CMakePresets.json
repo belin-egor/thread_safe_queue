@@ -1,6 +1,10 @@
 {
   "version": 3,
-  "cmakeMinimumRequired": { "major": 3, "minor": 21, "patch": 0 },
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 21,
+    "patch": 0
+  },
   "configurePresets": [
     {
       "name": "base",
@@ -20,18 +24,54 @@
       "name": "tsan",
       "displayName": "ThreadSanitizer (clang++-20)",
       "inherits": "base",
-      "cacheVariables": { "ENABLE_TSAN": "ON" }
+      "cacheVariables": {
+        "ENABLE_TSAN": "ON"
+      }
     },
     {
       "name": "asan",
       "displayName": "AddressSanitizer + UBSan (clang++-20)",
       "inherits": "base",
-      "cacheVariables": { "ENABLE_ASAN": "ON" }
+      "cacheVariables": {
+        "ENABLE_ASAN": "ON"
+      }
     }
   ],
   "buildPresets": [
-    { "name": "debug", "configurePreset": "debug" },
-    { "name": "tsan", "configurePreset": "tsan" },
-    { "name": "asan", "configurePreset": "asan" }
+    {
+      "name": "debug",
+      "configurePreset": "debug"
+    },
+    {
+      "name": "tsan",
+      "configurePreset": "tsan"
+    },
+    {
+      "name": "asan",
+      "configurePreset": "asan"
+    }
+  ],
+  "testPresets": [
+    {
+      "name": "debug",
+      "configurePreset": "debug",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "tsan",
+      "configurePreset": "tsan",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "asan",
+      "configurePreset": "asan",
+      "output": {
+        "outputOnFailure": true
+      }
+    }
   ]
 }
