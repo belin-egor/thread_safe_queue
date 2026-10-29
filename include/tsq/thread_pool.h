@@ -1,5 +1,6 @@
 #pragma once
 
+#include "tsq/task.h"
 #include "tsq/ts_queue.h"
 
 #include <cstddef>
@@ -12,7 +13,7 @@ namespace tsq {
 
 class thread_pool final {
 private:
-  ts_queue<std::function<void()>> tasks_;
+  ts_queue<tsq::task> tasks_;
   std::vector<std::jthread> workers_;
 public:
   explicit thread_pool(std::size_t poolSize) {
@@ -46,7 +47,7 @@ public:
   bool submit(std::nullptr_t) = delete;
   // The task must not throw: an exception escaping a task calls std::terminate.
   // TODO: propagate exceptions via std::future.
-  [[nodiscard]] bool submit(std::function<void()> task) {
+  [[nodiscard]] bool submit(tsq::task task) {
     if (!task) {
       throw std::invalid_argument{"task is empty"};
     }

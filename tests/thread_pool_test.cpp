@@ -6,6 +6,7 @@
 #include <chrono>
 #include <functional>
 #include <latch>
+#include <memory>
 #include <stdexcept>
 #include <thread>
 #include <vector>
@@ -27,6 +28,24 @@ TEST(ThreadPoolTest, EmptyTaskThrows) {
   tsq::thread_pool pool(1);
   std::function<void()> emptyTask;
   EXPECT_THROW((void)pool.submit(emptyTask), std::invalid_argument);
+}
+
+TEST(ThreadPoolTest, NullFunctionPointerThrows) {
+  tsq::thread_pool pool(1);
+  void (*nullFunction)() = nullptr;
+  EXPECT_THROW((void)pool.submit(nullFunction), std::invalid_argument);
+}
+
+TEST(ThreadPoolTest, MoveOnlyTask) {
+  std::atomic<int> result = 0;
+  {
+    tsq::thread_pool pool(2);
+    auto value = std::make_unique<int>(42);
+    EXPECT_TRUE(pool.submit([&result, value = std::move(value)]{
+      result = *value;
+    }));
+  }
+  EXPECT_EQ(result, 42);
 }
 
 TEST(ThreadPoolTest, AllTasksExecuted) {
