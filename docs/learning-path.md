@@ -10,9 +10,6 @@ A header-only CMake target (`INTERFACE` library) with C++20, warnings, and
 separate builds with ThreadSanitizer and AddressSanitizer, plus CMake
 presets for them.
 
-**Limitation:** there is nothing to build yet, and nothing to check the
-sanitizers on.
-
 ## 2. Thread-safe queue
 
 `ts_queue<T>` on `std::mutex` and `std::condition_variable`: `push`,
