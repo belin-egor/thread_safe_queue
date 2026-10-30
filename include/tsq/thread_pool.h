@@ -1,18 +1,21 @@
 #pragma once
 
+#include "tsq/task.h"
 #include "tsq/ts_queue.h"
 
 #include <cstddef>
-#include <functional>
+#include <future>
 #include <stdexcept>
 #include <thread>
+#include <type_traits>
+#include <utility>
 #include <vector>
 
 namespace tsq {
 
 class thread_pool final {
 private:
-  ts_queue<std::function<void()>> tasks_;
+  ts_queue<tsq::task> tasks_;
   std::vector<std::jthread> workers_;
 public:
   explicit thread_pool(std::size_t poolSize) {
@@ -44,13 +47,19 @@ public:
     tasks_.close();
   }
   bool submit(std::nullptr_t) = delete;
-  // The task must not throw: an exception escaping a task calls std::terminate.
-  // TODO: propagate exceptions via std::future.
-  [[nodiscard]] bool submit(std::function<void()> task) {
-    if (!task) {
-      throw std::invalid_argument{"task is empty"};
+
+  template <typename F>
+  [[nodiscard]] auto submit(F &&func) {
+    if (detail::is_null_callable(func)) {
+      throw std::invalid_argument("empty function");
     }
-    return tasks_.push(std::move(task));
+    using R = std::invoke_result_t<std::decay_t<F>&>;
+    std::packaged_task<R()> task{std::forward<F>(func)};
+    std::future<R> fut = task.get_future();
+    if (!tasks_.push(std::move(task))) {
+      throw std::runtime_error("thread_pool is shutting down");
+    }
+    return fut;
   }
 };
 

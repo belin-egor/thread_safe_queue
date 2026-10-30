@@ -7,7 +7,9 @@ understand why each piece is needed, and verify them with sanitizers:
 - `tsq::ts_queue<T>`: a blocking queue built on `std::mutex` and
   `std::condition_variable`, with graceful shutdown via `close()`;
 - `tsq::thread_pool`: a fixed-size pool of `std::jthread` workers that
-  takes tasks from that queue.
+  takes tasks from that queue and returns results via `std::future`;
+- `tsq::task`: a move-only type-erased `void()` callable used as the
+  pool's task type (unlike `std::function`, it accepts move-only lambdas).
 
 ## Roadmap
 
@@ -22,8 +24,9 @@ squashed pull request.
   waiting consumers and lets them drain what is left.
 - [x] **4. Thread pool.** Workers run `std::function<void()>` tasks; the
   destructor finishes all pending tasks before joining.
-- [ ] **5. Results via `std::future`.** `submit` returns a future with the
-  task's result or its exception (`std::packaged_task`).
+- [x] **5. Results via `std::future`.** `submit` returns a future with the
+  task's result or its exception (`std::packaged_task`); tasks are stored
+  in the move-only `tsq::task` instead of `std::function`.
 - [ ] **6. Extras (optional).** Waiting for all tasks, immediate shutdown,
   nested `submit` deadlock, benchmarks.
 
@@ -33,8 +36,8 @@ squashed pull request.
 #include <tsq/thread_pool.h>
 #include <tsq/ts_queue.h>
 
-#include <atomic>
 #include <iostream>
+#include <stdexcept>
 
 int main() {
   tsq::ts_queue<int> queue;
@@ -44,24 +47,33 @@ int main() {
     std::cout << *value << '\n';
   }
 
-  std::atomic<int> counter = 0;
-  {
-    tsq::thread_pool pool(4);
-    for (int i = 0; i < 100; ++i) {
-      (void)pool.submit([&counter] { ++counter; });
-    }
-  }  // the destructor runs every pending task, then joins the workers
-  std::cout << counter << '\n';  // 100
-}
+  tsq::thread_pool pool(4);
+  std::future<int> answer = pool.submit([] { return 6 * 7; });
+  std::cout << answer.get() << '\n';  // 42
+
+  auto failed = pool.submit([]() -> int {
+    throw std::runtime_error("task failed");
+  });
+  try {
+    failed.get();  // rethrows the exception from the task
+  } catch (const std::runtime_error &e) {
+    std::cout << e.what() << '\n';
+  }
+}  // the pool destructor runs every pending task, then joins the workers
 ```
 
 Contracts worth knowing:
 
-- `push` and `submit` return `false` once the queue or the pool is closed.
-- `thread_pool(0)` and submitting an empty task throw
-  `std::invalid_argument`.
-- A task must not throw: an exception escaping a task calls
-  `std::terminate` (until stage 5).
+- `push` returns `false` once the queue is closed.
+- `thread_pool(0)` and submitting an empty task (a null function pointer
+  or an empty `std::function`) throw `std::invalid_argument`.
+- An exception thrown by a task is stored in its future and rethrown by
+  `get()`; the worker keeps running.
+- `submit` may be called from several threads at once, including from
+  inside a task. A task that submits while the pool is being destroyed
+  gets `std::runtime_error`.
+- Dropping a future is fine: the task still runs, and the future's
+  destructor does not block (unlike futures from `std::async`).
 
 ## Building and testing
 

@@ -13,6 +13,6 @@ FetchContent_MakeAvailable(googletest)
 
 include(GoogleTest)
 
-add_executable(tsq_test ts_queue_test.cpp thread_pool_test.cpp)
+add_executable(tsq_test ts_queue_test.cpp task_test.cpp thread_pool_test.cpp)
 target_link_libraries(tsq_test PRIVATE tsq GTest::gtest_main)
 gtest_discover_tests(tsq_test PROPERTIES TIMEOUT 10)
