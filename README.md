@@ -14,7 +14,9 @@ understand why each piece is needed, and verify them with sanitizers:
 ## Roadmap
 
 The project grows in small stages; each stage is merged into `main` as one
-squashed pull request.
+squashed pull request. Want to build it yourself? See
+[docs/learning-path.md](docs/learning-path.md): what each stage builds
+and which limitation leads to the next one.
 
 - [x] **1. Build setup.** CMake, C++20, CMake presets, ThreadSanitizer and
   AddressSanitizer builds.
@@ -102,6 +104,7 @@ Tests are built only when this is the top-level project (`TSQ_BUILD_TESTS`).
 ## Layout
 
 ```
+docs/          the learning path guide
 include/tsq/   the library headers
 tests/         GoogleTest unit tests
 examples/      a producer/consumer example
