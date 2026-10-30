@@ -8,6 +8,27 @@
 
 namespace tsq {
 
+namespace detail {
+
+template <typename T>
+struct is_std_function : std::false_type {};
+
+template <typename Sig>
+struct is_std_function<std::function<Sig>> : std::true_type {};
+
+template <typename F>
+bool is_null_callable(const F &func) {
+  using raw_t = std::remove_cvref_t<F>;
+  if constexpr (std::is_pointer_v<raw_t> || is_std_function<raw_t>::value) {
+    if (!func) {
+      return true;
+    }
+  }
+  return false;
+}
+
+} // namespace detail
+
 // Move-only type-erased wrapper for a callable with signature void().
 // Unlike std::function, it also accepts move-only callables.
 class task {
@@ -27,12 +48,6 @@ class task {
     }
   };
 
-  template <typename T>
-  struct is_std_function : std::false_type {};
-
-  template <typename Sig>
-  struct is_std_function<std::function<Sig>> : std::true_type {};
-
   std::unique_ptr<callable_base> ptr_;
 
 public:
@@ -45,12 +60,10 @@ public:
   task(F &&func) {
     // Like std::function: a null function pointer or an empty std::function
     // gives an empty task instead of a task that fails when called.
-    using raw_t = std::remove_cvref_t<F>;
-    if constexpr (std::is_pointer_v<raw_t> || is_std_function<raw_t>::value) {
-      if (!func) {
-        return;
-      }
+    if (detail::is_null_callable(func)) {
+      return;
     }
+
     ptr_ = std::make_unique<callable_impl<std::decay_t<F>>>(
         std::forward<F>(func));
   }
