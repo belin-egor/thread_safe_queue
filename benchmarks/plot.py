@@ -46,13 +46,17 @@ def load(path):
         samples[name].append(run)
 
     families = defaultdict(list)
-    for name in samples.keys() | medians.keys():
+    # dict.fromkeys keeps the order of the JSON, so pools come in the order
+    # they were registered.
+    for name in dict.fromkeys([*samples, *medians]):
         runs = samples.get(name) or [medians[name]]
         family, *parts = name.split("/")
         point = {}
         for i, part in enumerate(p for p in parts if p != "real_time"):
             key, sep, value = part.partition(":")
-            point[key if sep else f"arg{i}"] = int(value if sep else key)
+            if not sep:
+                key, value = f"arg{i}", key
+            point[key] = int(value) if value.isdigit() else value  # pool:asio
         point["time_ns"] = statistics.median(
             r["real_time"] * TO_NS[r["time_unit"]] for r in runs)
         if "per_task" in runs[0]:
@@ -171,14 +175,20 @@ def main():
         if plot is None:
             print(f"skipped {family}: no plot for it")
             continue
-        fig, ax = plt.subplots(figsize=(8, 5))
-        plot(ax, points)
-        ax.set_title(family)
-        # Major ticks only: on log axes minor lines (2..9 per decade) are
-        # uneven and clutter the plot.
-        ax.grid(True, which="major", alpha=0.3)
-        if ax.get_legend_handles_labels()[0]:
-            ax.legend(fontsize=8)
+        # One subplot per pool, side by side with a shared Y axis, so the
+        # same line can be compared across pools at a glance.
+        pools = list(dict.fromkeys(p.get("pool") for p in points))
+        fig, axes = plt.subplots(1, len(pools), figsize=(7 * len(pools), 5),
+                                 sharey=True, squeeze=False)
+        for ax, pool in zip(axes[0], pools):
+            plot(ax, [p for p in points if p.get("pool") == pool])
+            ax.set_title(pool or "")
+            # Major ticks only: on log axes minor lines (2..9 per decade) are
+            # uneven and clutter the plot.
+            ax.grid(True, which="major", alpha=0.3)
+            if ax.get_legend_handles_labels()[0]:
+                ax.legend(fontsize=8)
+        fig.suptitle(family)
         fig.tight_layout()
         path = out / f"{family}.png"
         fig.savefig(path, dpi=120)
