@@ -42,3 +42,14 @@ if(TSQ_BUILD_TESTS)
   enable_testing()
   add_subdirectory(tests)
 endif()
+
+# Benchmarks are opt-in: use the "release" preset to build them.
+option(TSQ_BUILD_BENCHMARKS "Build tsq benchmarks" OFF)
+
+if(TSQ_BUILD_BENCHMARKS)
+  if(NOT CMAKE_BUILD_TYPE STREQUAL "Release" OR ENABLE_TSAN OR ENABLE_ASAN)
+    message(WARNING "Benchmarks need a Release build without sanitizers, "
+                    "otherwise the numbers are meaningless")
+  endif()
+  add_subdirectory(benchmarks)
+endif()
