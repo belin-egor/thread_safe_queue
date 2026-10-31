@@ -50,15 +50,34 @@ exception. `packaged_task` is move-only, and `std::function` requires
 copyable callables, so the queue now stores `tsq::task`, a small move-only
 type-erased `void()` wrapper.
 
-**Limitation:** a task that waits on `get()` of a subtask inside the same
-pool can block a worker, and with all workers blocked the pool deadlocks.
-There is also no way to wait for all tasks or to stop without running the
-pending ones.
+**Limitation:** the pool works, but nothing says how fast it is: how much
+one task costs, and when splitting work into tasks pays off.
 
-## 6. Extras (optional)
+## 6. Benchmarks
 
+A `release` preset and Google Benchmark. A CPU-bound work loop kept alive
+with `benchmark::DoNotOptimize`; `UseRealTime()`, since the work runs on
+other threads. Each benchmark varies one parameter at a time: empty tasks
+for the pure overhead, a fixed task size with a growing number of tasks,
+a fixed number of tasks with a growing task size, strong scaling, and
+nested `submit`. The same benchmarks run against `asio::thread_pool`, and
+a Python script plots the JSON output.
+
+What to expect: a task costs a few hundred nanoseconds with one worker
+and about a microsecond with many, waking a sleeping thread costs
+microseconds, and on a hybrid CPU a task that lands on a slow core holds
+up the whole batch unless there are more tasks than threads.
+
+**Limitation:** every task goes through one queue with one mutex, so with
+many workers the overhead grows instead of shrinking. A task that waits on
+`get()` of a subtask inside the same pool can block a worker, and with all
+workers blocked the pool deadlocks. There is also no way to wait for all
+tasks or to stop without running the pending ones.
+
+## 7. Extras (optional)
+
+- A queue per worker with work stealing, compared with stage 6.
 - Nested `submit` and the deadlock from stage 5.
 - `wait_all()`, or an immediate shutdown that drops pending tasks
   (`std::stop_token`).
-- Benchmarks: the pool vs `std::async` vs a single thread; `tsq::task` vs
-  `std::function` with `std::shared_ptr`.
+- `tsq::task` vs `std::function` with `std::shared_ptr`.

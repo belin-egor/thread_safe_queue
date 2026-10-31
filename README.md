@@ -29,8 +29,10 @@ and which limitation leads to the next one.
 - [x] **5. Results via `std::future`.** `submit` returns a future with the
   task's result or its exception (`std::packaged_task`); tasks are stored
   in the move-only `tsq::task` instead of `std::function`.
-- [ ] **6. Extras (optional).** Waiting for all tasks, immediate shutdown,
-  nested `submit` deadlock, benchmarks.
+- [x] **6. Benchmarks.** Google Benchmark: overhead per task, scaling with
+  threads, nested `submit`, and a comparison with `asio::thread_pool`.
+- [ ] **7. Extras (optional).** Work stealing, waiting for all tasks,
+  immediate shutdown, nested `submit` deadlock.
 
 ## Usage
 
@@ -84,13 +86,44 @@ on recent Linux kernels the ThreadSanitizer runtime of older toolchains
 fails with "unexpected memory mapping".
 
 ```sh
-cmake --preset tsan              # or: debug, asan
+cmake --preset tsan              # or: debug, asan, release
 cmake --build --preset tsan
 ctest --preset tsan
 ```
 
-Tests use GoogleTest, fetched automatically by CMake. CI runs all three
-presets on every pull request.
+Tests use GoogleTest, fetched automatically by CMake. CI builds and tests
+all four presets on every pull request.
+
+## Benchmarks
+
+The `release` preset (optimized, no sanitizers) also builds the
+benchmarks. They use Google Benchmark and standalone Asio, both fetched by
+CMake for the benchmarks only; the library itself has no dependencies.
+
+```sh
+cmake --preset release
+cmake --build --preset release
+./build/release/benchmarks/pool_benchmark --benchmark_filter=BM_EmptyTasks \
+    --benchmark_out=results.json --benchmark_out_format=json
+python3 benchmarks/plot.py results.json -o plots/   # needs matplotlib
+```
+
+Every pool benchmark runs for both `tsq::thread_pool` (`pool:tsq`) and
+`asio::thread_pool` (`pool:asio`). What they measure:
+
+- `BM_EmptyTasks`: pure overhead of one task, by batch size;
+- `BM_FixedTaskSize`, `BM_TaskSizeSweep`: how the overhead depends on the
+  number of tasks and on the size of one task;
+- `BM_SimpleCycleInPool`, `BM_StrongScaling`: a fixed amount of work split
+  into tasks, by number of threads;
+- `BM_NestedSubmit`: tasks that submit tasks from inside the pool.
+
+On an Intel i7-14700HX (8 P-cores + 12 E-cores) one task costs about
+0.35 us with one worker and about 1 us with 4 or more: every task passes
+through one mutex. Both pools behave about the same, since `asio` also
+uses a single shared queue for `post`. For stable numbers pin the run to
+one core type (`taskset`) and use `--benchmark_repetitions`; CI builds the
+benchmarks but does not run them.
 
 ## Using it in another CMake project
 
@@ -107,5 +140,6 @@ Tests are built only when this is the top-level project (`TSQ_BUILD_TESTS`).
 docs/          the learning path guide
 include/tsq/   the library headers
 tests/         GoogleTest unit tests
+benchmarks/    Google Benchmark benchmarks and the plot script
 examples/      a producer/consumer example
 ```
