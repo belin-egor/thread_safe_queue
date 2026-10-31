@@ -172,3 +172,69 @@ BENCHMARK_TEMPLATE(BM_Batch, tsq_pool)
 BENCHMARK_TEMPLATE(BM_Batch, asio_pool)
     ->Name("BM_TaskSizeSweep/pool:asio")
     ->Apply(task_size_sweep_args);
+
+// Nested submit: nThreads parent tasks each submit nChildren child tasks
+// from inside the pool (nested:1), compared with the main thread submitting
+// the same children itself (nested:0). Parents do not wait for their
+// children, that could block every worker; they return the children's
+// futures, and the main thread waits for them.
+template <typename Pool>
+static void BM_NestedSubmit(benchmark::State &state) {
+  const std::size_t nThreads = state.range(0);
+  const std::size_t nChildren = state.range(1);
+  const int64_t taskSize = state.range(2);
+  const bool nested = state.range(3) != 0;
+  Pool pool{nThreads};
+
+  using children_t = std::vector<std::future<void>>;
+  auto spawn = [&pool, nChildren, taskSize] {
+    children_t children;
+    children.reserve(nChildren);
+    for (std::size_t i = 0; i < nChildren; ++i) {
+      children.push_back(pool.submit([taskSize] { burn(taskSize); }));
+    }
+    return children;
+  };
+  std::vector<std::future<children_t>> parents;
+  parents.reserve(nThreads);
+  std::vector<children_t> batches;
+  batches.reserve(nThreads);
+
+  for (auto _ : state) {
+    for (std::size_t i = 0; i < nThreads; ++i) {
+      if (nested) {
+        parents.push_back(pool.submit(spawn));
+      } else {
+        batches.push_back(spawn());
+      }
+    }
+    for (auto &parent : parents) {
+      batches.push_back(parent.get());
+    }
+    for (auto &children : batches) {
+      for (auto &fut : children) {
+        fut.get();
+      }
+    }
+    parents.clear();
+    batches.clear();
+  }
+  // Counted per child task, as in BM_Batch; parent tasks are not counted.
+  const std::size_t nTasks = nThreads * nChildren;
+  state.SetItemsProcessed(state.iterations() * nTasks);
+  state.counters["per_task"] = benchmark::Counter(
+      static_cast<double>(nTasks),
+      benchmark::Counter::kIsIterationInvariantRate | benchmark::Counter::kInvert);
+}
+
+static void nested_submit_args(benchmark::internal::Benchmark *b) {
+  b->ArgsProduct({{1, 2, 4, 8, 16}, {1000}, {0, 10000}, {0, 1}})
+      ->ArgNames({"nThreads", "nChildren", "taskSize", "nested"})
+      ->UseRealTime();
+}
+BENCHMARK_TEMPLATE(BM_NestedSubmit, tsq_pool)
+    ->Name("BM_NestedSubmit/pool:tsq")
+    ->Apply(nested_submit_args);
+BENCHMARK_TEMPLATE(BM_NestedSubmit, asio_pool)
+    ->Name("BM_NestedSubmit/pool:asio")
+    ->Apply(nested_submit_args);

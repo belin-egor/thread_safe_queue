@@ -145,6 +145,27 @@ def plot_task_size(ax, points, unit_ns):
     ax.set_ylabel("wall time per task, ns")
 
 
+def plot_nested(ax, points):
+    """Time per child task vs nThreads; color is the task size, solid lines
+    are children submitted from inside the pool, dashed from the main
+    thread."""
+    for i, size in enumerate(sorted({p["taskSize"] for p in points})):
+        for nested, style, how in ((0, "--", "from main"), (1, "-", "nested")):
+            line = sorted((p for p in points
+                           if p["taskSize"] == size and p["nested"] == nested),
+                          key=lambda p: p["nThreads"])
+            ax.plot([p["nThreads"] for p in line],
+                    [p["per_task_ns"] for p in line], color=f"C{i}",
+                    linestyle=style, marker="o",
+                    label=f"taskSize={size}, {how}")
+    ax.set_yscale("log")
+    ax.yaxis.set_major_formatter(ScalarFormatter())
+    ax.yaxis.set_minor_formatter(ScalarFormatter())
+    ax.grid(True, which="minor", axis="y", alpha=0.3)  # minor ticks are labeled
+    ax.set_xlabel("nThreads (= number of parent tasks)")
+    ax.set_ylabel("wall time per child task, ns")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawTextHelpFormatter)
@@ -169,6 +190,7 @@ def main():
             plot_per_task(ax, pts, "nTasks", "nThreads"),
         "BM_TaskSizeSweep": lambda ax, pts:
             plot_task_size(ax, pts, unit_ns),
+        "BM_NestedSubmit": plot_nested,
     }
     for family, points in sorted(families.items()):
         plot = plots.get(family)
