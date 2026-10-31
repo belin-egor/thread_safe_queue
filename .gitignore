@@ -8,3 +8,8 @@ build_ex.sh
 
 # Editor settings
 .vscode/
+
+# Benchmark results and plots (benchmarks/plot.py)
+results.json
+plots/
+__pycache__/
